@@ -6,13 +6,30 @@ import (
 	"os"
 )
 
-func parseArgs() string {
-	if len(os.Args) != 2 {
+func parseArgs() (string, int) {
+	if len(os.Args) == 1 {
 		fmt.Println("Incorrect usage!!")
-		os.Exit(1)
-	}
-	var binary_name string = os.Args[1]
-	return binary_name
+	} else if len(os.Args) == 2 {
+        fmt.Println("Help")
+    } else if len(os.Args) == 3 {
+        var binary_name string = os.Args[2]
+        if os.Args[1] == "-H" {
+            var mode int = 1 
+	        return binary_name, mode
+        } else if os.Args[1] == "-P"{
+            var mode int = 2
+            return binary_name, mode
+        } else if os.Args[1] == "-S" {
+            var mode int = 3
+            return binary_name, mode
+        } else {
+           fmt.Println("Incorrect usage!!")
+        }
+    } else {
+        fmt.Println("Incorrect usage!!")
+        os.Exit(1)
+    }
+    return "", -1
 }
 
 func check(e error) {
@@ -86,8 +103,12 @@ func prettyPrintSheader(section_header SectionHeader) {
 
 func main() {
 	// parse the cli-arguments
-	var binary_name string = parseArgs()
-
+	var binary_name string
+    var mode int
+    binary_name, mode = parseArgs()
+    if mode == -1 {
+        os.Exit(1)
+    }
 	//open the binary to read
 	f, err := os.Open(binary_name)
 	check(err)
@@ -105,44 +126,41 @@ func main() {
     if magic != MAGIC {
 		fmt.Println("Not an ELF binary!!")
 		os.Exit(1)
-	}
-
-	// populate the struct
-	err = binary.Read(f, binary.LittleEndian, &header)
+	}   
+    // populate the struct
+    err = binary.Read(f, binary.LittleEndian, &header)
 	check(err)
-
-    // fmt.Println(header)
-	prettyPrintHeader(header)
     
-    // seek to the start of program header
-    f.Seek(int64(header.Phdr_offset), 0)
+    switch mode {
+    case 1:
+	    prettyPrintHeader(header)
+    case 2:
+    	// seek to the start of program header
+        f.Seek(int64(header.Phdr_offset), 0)
 
-    // now we parse the program header
-    var program_header ProgramHeader = ProgramHeader{}
-    fmt.Println("###### ELF Program Header ######")
-
-    for i := 0; i < int(header.Phdr_entries); i++ {
-        err = binary.Read(f, binary.LittleEndian, &program_header)
-        check(err)
-        fmt.Printf("Entry #%d\n", i + 1)
-        prettyPrintPheader(program_header)
-    }
-
-    // section header table of the ELF file
-    f.Seek(int64(header.Shdr_offset), 0)
+        // now we parse the program header
+        var program_header ProgramHeader = ProgramHeader{}
+        fmt.Println("###### ELF Program Header ######")
     
-    // parse the section header
-    var section_header SectionHeader = SectionHeader{}
-    fmt.Println("###### Section Header Entries ######")
+        for i := 0; i < int(header.Phdr_entries); i++ {
+            err = binary.Read(f, binary.LittleEndian, &program_header)
+            check(err)
+            fmt.Printf("Entry #%d\n", i + 1)
+            prettyPrintPheader(program_header)
+        }
+    case 3:
+        // section header table of the ELF file
+        f.Seek(int64(header.Shdr_offset), 0)
+    
+        // parse the section header
+        var section_header SectionHeader = SectionHeader{}
+        fmt.Println("###### Section Header Entries ######")
 
-    for i := 0; i < int(header.Shdr_entries); i++ {
-        err = binary.Read(f, binary.LittleEndian, &section_header)
-        check(err)
-        fmt.Printf("Entry #%d\n", i + 1)
-        prettyPrintSheader(section_header)
-
+        for i := 0; i < int(header.Shdr_entries); i++ {
+            err = binary.Read(f, binary.LittleEndian, &section_header)
+            check(err)
+            fmt.Printf("Entry #%d\n", i + 1)
+            prettyPrintSheader(section_header)
+        }
     }
-
-
-
 }
